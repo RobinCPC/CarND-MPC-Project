@@ -101,6 +101,32 @@ int main() {
           double steer_value;
           double throttle_value;
 
+          //  fit a polynomial to the desired x and y coordinates (ptsx, ptsy)
+          Eigen::VectorXd xvals(ptsx.size());
+          Eigen::VectorXd yvals(ptsy.size());
+          for(size_t e=0; e < ptsx.size(); ++e){
+              xvals[e] = ptsx[e];
+              yvals[e] = ptsy[e];
+          }
+          Eigen::VectorXd coeffs = polyfit(xvals, yvals, 3);
+          
+          // calculate cross track error (cte) and orientation error
+          double cte = polyeval(coeffs, px) - py;
+          double epsi = psi - atan(coeffs[1]);
+
+          Eigen::VectorXd state(6);
+          state << px, py, psi, v, cte, epsi;
+
+          // Using MPC to predict
+          auto out_vars = mpc.Solve(state, coeffs);
+
+          double delta_t = out_vars[0];
+          throttle_value = out_vars[1];
+          
+          // compute steer_valur (delta_{t+1})
+          const double Lf = 2.67;
+          steer_value = -delta_t/Lf;
+
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
@@ -113,6 +139,12 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
+          for(size_t i=2; i < out_vars.size(); ++i){
+              if(i%2 == 0)
+                  mpc_x_vals.push_back(out_vars[i]);
+              else
+                  mpc_y_vals.push_back(out_vars[i]);
+          }
 
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
@@ -123,6 +155,10 @@ int main() {
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+          for(size_t i=0; i < ptsx.size(); ++i){
+              next_x_vals.push_back(ptsx[i]);
+              next_y_vals.push_back(ptsy[i]);
+          }
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
