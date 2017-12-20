@@ -2,6 +2,8 @@
 Self-Driving Car Engineer Nanodegree Program
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
+![demo](./MPC-demo.gif)
+
 ---
 ## Intro
 In this project, The goal is to implement Model Predictive Control to drive around the track as fast as possible and safely. Model Predictive Control (MPC), described in wikipedia, 
