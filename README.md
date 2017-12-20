@@ -1,8 +1,81 @@
 # CarND-Controls-MPC
 Self-Driving Car Engineer Nanodegree Program
+[![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
 ---
+## Intro
+In this project, The goal is to implement Model Predictive Control to drive around the track as fast as possible and safely. Model Predictive Control (MPC), described in wikipedia, 
+is an advanced method of process control and it rely on dynamic models of the process (vehicle in this project). For this project, MPC reframes the task of following a trajectory 
+as an optimization problem, and it involves simulating different actuator inputs, then predicting the result of the trajectory and selecting certain trajectory with a minimum cost.
 
+
+## The Model
+The MPC controller use vehicle dynamic model and actuator inputs to build state equation for trajectory optimization.
+
+The state of dynamic model includes: position (x, and y), orientation (psi), velocity (v), acceleration (a), steering angle of vehicle (delta), cross-track error (cte) and angle 
+difference (error) between vehicle orientation and track direction (epsi). In this project, we could use actuators (throttle and steering) to control acceleration and steering angle, 
+then update vehicle state and follow (optimize) trajectory. Below is the state equations:
+
+```
+x = x + v * cos(psi) * dt
+y = y + v * sin(psi) * dt
+psi = psi + (V/Lf) * delta * dt
+v = v + a * dt
+```
+
+Where, 
+Lf is the length from the front wheel to the center of gravity (CoG) of the vehicle in the simulation.
+dt is the assumption time step for state prediction.
+
+## Polynomial Fitting and MPC Preprocessing.
+Because the sensor input for waypoints are in the world (map) coordination system (and 90 degree difference at orientation), 
+we need to transform position & orientation from world to vehicle coordination system. Here is the codes for preprocessing:
+
+``` cpp
+for(size_t e=0; e < ptsx.size(); ++e){
+  double x_car = ptsx[e] - px;
+  double y_car = ptsy[e] - py;
+
+  xvals[e] = x_car * cos(0-psi) - y_car * sin(0-psi);
+  yvals[e] = x_car * sin(0-psi) + y_car * cos(0-psi);
+}
+```
+
+After preprocessing, we could use transformed waypoints to do polynomial fitting. Here, in order to fit the track, we used 3rd order to fit
+possible double curve waypoints.
+
+## Model Predictive Control with Latency.
+In this simulation (also real world situation) there is a latency between command sending and execution, and the output command may not optimize
+the current situation. To deal with latency, we need to update the vehicle state model depend on the possible latency (100 ms for the simulation).
+Here is the codes for updating state model.
+
+``` cpp
+// In vehicle coordination, positon and orientation are always zeros
+// so px, py, and psi = 0;
+double latency = 0.1;
+double est_px = v * latency;
+double est_py = 0;
+double est_psi = (v / Lf) * delta * latency;
+double est_v = v + acc * latency;
+double est_cte = cte + v * sin(epsi) * latency;
+double est_epsi = epsi + v * (delta / Lf) * latency;
+```
+
+## Timestep Length and Elapsed Duration (N & dt)
+The product of timestep length (N) and elapsed duration (dt) is called Prediction horizon (T), which is the duration over the future predictions are 
+made. N is the number of step in the prediction horizon and dt is how much time elapse between each actuation inputs. There is tradeoffs to choose N 
+and dt. From the lesson, T should be a few seconds for predicting the process (tracking trajectory), because the trajectory for optimizing will change 
+faster when vehicle driving in higher speed. In this project, I set T about 1.0 to 1.5 seconds. In order to control actuator to react fast changing
+trajectory in high speed (over 70 mph), I set dt to 0.05 second. To predict 1 second duration with 0.05 second step, I set N to 20.
+
+For tuning the parameters in cost function, I first testing with low speed (~ 40 mph) and tune one parameter each time. If I only tune the weighting 
+of `cte`, the vehicle will try to follow the track but driving oscillating to follow the track. Then, I need to tune the weight of `epsi`. In order 
+to keep vehicle to drive more stable, I will tune the weight of `delta (steer angle)` to turn the vehicle more smoothly.
+
+
+Below is the original README form the Udacity repo.
+
+---
 ## Dependencies
 
 * cmake >= 3.5
